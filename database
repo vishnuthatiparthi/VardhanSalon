@@ -1,0 +1,49 @@
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+/* ---------- SERVICES ---------- */
+CREATE TABLE services (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0)
+);
+
+/* ---------- STAFF ---------- */
+CREATE TABLE staff (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL
+);
+
+/* ---------- APPOINTMENTS ---------- */
+CREATE TABLE appointments (
+  id SERIAL PRIMARY KEY,
+  customer_name VARCHAR(100) NOT NULL,
+  customer_phone VARCHAR(10) NOT NULL
+    CHECK (customer_phone ~ '^[6-9][0-9]{9}$'),
+  service_id INTEGER NOT NULL REFERENCES services(id),
+  staff_id INTEGER NOT NULL REFERENCES staff(id),
+  appointment_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
+  CHECK (end_time > appointment_time)
+);
+
+/* ---------- PREVENT DOUBLE BOOKING ---------- */
+ALTER TABLE appointments
+ADD CONSTRAINT no_staff_overlap
+EXCLUDE USING gist (
+  staff_id WITH =,
+  tstzrange(appointment_time, end_time) WITH &&
+);
+
+/* ---------- INDEXES ---------- */
+CREATE INDEX idx_appointments_time ON appointments (appointment_time);
+CREATE INDEX idx_appointments_staff ON appointments (staff_id);
+
+/* ---------- SEED DATA ---------- */
+INSERT INTO staff (name)
+VALUES ('Barber 1'), ('Barber 2');
+
+INSERT INTO services (name, price, duration_minutes)
+VALUES
+('Haircut', 500, 30),
+('Beard Trim', 300, 20);
